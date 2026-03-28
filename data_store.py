@@ -40,15 +40,20 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 # --- Backend helper ---
 
 def _get_backend():
-    creds = st.session_state.get("gdrive_creds")
-    if creds:
-        try:
-            from gdrive_store import GDriveStore
-            return GDriveStore(creds)
-        except Exception:
-            return None
-    return None
-
+    """Tries to initialize Google Drive backend from Streamlit Secrets."""
+    if "gdrive_creds" not in st.session_state:
+        # Check if credentials exist in Streamlit Secrets
+        if "SERVICE_ACCOUNT_JSON" in st.secrets:
+            try:
+                from gdrive_store import GDriveStore
+                # Parse the secret string back into a dict
+                creds_dict = json.loads(st.secrets["SERVICE_ACCOUNT_JSON"])
+                st.session_state["gdrive_creds"] = GDriveStore(creds_dict)
+            except Exception as e:
+                st.error(f"Failed to initialize Google Drive: {e}")
+                return None
+    
+    return st.session_state.get("gdrive_creds")
 
 # --- Unified I/O ---
 
