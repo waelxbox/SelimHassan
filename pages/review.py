@@ -1,4 +1,5 @@
 # pages/review.py
+
 import io
 from PIL import Image, ImageOps
 from datetime import datetime, timezone
@@ -9,7 +10,6 @@ from data_store import (
     STATUS_PENDING, STATUS_REVIEWED, STATUS_FLAGGED, STATUS_ERROR
 )
 
-# Updated filters for the Antiquities Service schema
 FILTER_OPTIONS = [
     "Pending only", 
     "All", 
@@ -24,7 +24,6 @@ def _apply_filter(cards, filter_opt):
     if filter_opt == "Reviewed only": return [c for c in cards if c["status"] == STATUS_REVIEWED]
     if filter_opt == "Flagged only": return [c for c in cards if c["status"] == STATUS_FLAGGED]
     if filter_opt == "With annotations/stamps": 
-        # Safely check if the JSON has stamps/annotations recorded
         return [c for c in cards if c.get("has_annotations", False)] 
     if filter_opt == "Errors only": return [c for c in cards if c["status"] == STATUS_ERROR]
     return cards
@@ -73,7 +72,6 @@ def render():
     data = load_json(card)
     status = data.get("_review_status", STATUS_PENDING)
 
-    # Clean, text-based status indicators
     badge_map = {
         STATUS_PENDING: "[Pending]", 
         STATUS_REVIEWED: "[Reviewed]", 
@@ -111,17 +109,29 @@ def render():
         st.subheader("Transcription & Translation")
         edited = {}
         
-        # Metadata Section
+        # Core Document Metadata
         col_meta1, col_meta2 = st.columns(2)
         with col_meta1:
-            edited["Document_Date"] = st.text_input("Date (YYYY-MM-DD)", value=data.get("Document_Date") or "")
-        with col_meta2:
+            edited["Reference_Number"] = st.text_input("Reference No.", value=data.get("Reference_Number") or "")
             edited["Sender"] = st.text_input("Sender", value=data.get("Sender") or "")
+        with col_meta2:
+            edited["Document_Date"] = st.text_input("Date (YYYY-MM-DD)", value=data.get("Document_Date") or "")
+            edited["Recipient"] = st.text_input("Recipient", value=data.get("Recipient") or "")
             
-        edited["Recipient"] = st.text_input("Recipient", value=data.get("Recipient") or "")
+        edited["Excavation_Site"] = st.text_input("Excavation Site", value=data.get("Excavation_Site") or "")
         edited["Brief_Summary"] = st.text_area("Brief Summary", value=data.get("Brief_Summary") or "", height=68)
         
-        # Annotations
+        # Arrays / Tags
+        col_arr1, col_arr2 = st.columns(2)
+        with col_arr1:
+            edited["Entities_Mentioned"] = str_to_list(
+                st.text_area("Entities Mentioned", value=list_to_str(data.get("Entities_Mentioned")), height=68, help="One entry per line.")
+            )
+        with col_arr2:
+            edited["Thematic_Tags"] = str_to_list(
+                st.text_area("Thematic Tags", value=list_to_str(data.get("Thematic_Tags")), height=68, help="One entry per line.")
+            )
+
         edited["Stamps_and_Annotations"] = str_to_list(
             st.text_area("Stamps & Marginalia", value=list_to_str(data.get("Stamps_and_Annotations")), height=68, help="One entry per line.")
         )
@@ -170,7 +180,6 @@ def render():
 
     st.divider()
     
-    # Clean text-based bottom navigation
     nav_cols = st.columns(min(len(filtered), 20))
     for i, col in enumerate(nav_cols):
         c = filtered[i]
