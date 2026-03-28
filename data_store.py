@@ -14,7 +14,7 @@ import streamlit as st
 DATA_DIR = Path(__file__).parent / "data"
 UPLOADS_DIR = DATA_DIR / "uploads"
 TRANSCRIPTIONS_DIR = DATA_DIR / "transcriptions"
-EXPORT_CSV = DATA_DIR / "metadata.csv" # Updated to match standard database naming
+EXPORT_CSV = DATA_DIR / "metadata.csv"
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
 STATUS_PENDING = "pending"
@@ -22,11 +22,11 @@ STATUS_REVIEWED = "reviewed"
 STATUS_FLAGGED = "flagged"
 STATUS_ERROR = "error"
 
-# Updated for the Antiquities Service schema
+# Updated with new historical and relational metadata fields
 EDITABLE_FIELDS = [
-    "Document_Date", "Sender", "Recipient", "Brief_Summary", 
-    "Original_Transcription", "English_Translation", 
-    "Stamps_and_Annotations", "Confidence_Notes"
+    "Reference_Number", "Document_Date", "Sender", "Recipient", "Excavation_Site", 
+    "Brief_Summary", "Original_Transcription", "English_Translation", 
+    "Stamps_and_Annotations", "Entities_Mentioned", "Thematic_Tags", "Confidence_Notes"
 ]
 
 CSV_FIELDNAMES = ["image", "reviewed_at", "status"] + EDITABLE_FIELDS
@@ -40,7 +40,6 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 # --- Backend helper ---
 
 def _get_backend():
-    """Return a GDriveStore if credentials are available, else None (local mode)."""
     creds = st.session_state.get("gdrive_creds")
     if creds:
         try:
@@ -78,7 +77,7 @@ def list_cards() -> list[dict]:
                 "status": data.get("_review_status", STATUS_PENDING) if data else "not_transcribed",
                 "has_json": bool(json_file),
                 "has_error": "error" in data,
-                "has_annotations": bool(data.get("Stamps_and_Annotations")), # Replaced hieroglyph check
+                "has_annotations": bool(data.get("Stamps_and_Annotations")),
             })
     else:
         for img_path in sorted(UPLOADS_DIR.iterdir()):
@@ -99,7 +98,7 @@ def list_cards() -> list[dict]:
                 "status": data.get("_review_status", STATUS_PENDING) if data else "not_transcribed",
                 "has_json": json_path.exists(),
                 "has_error": "error" in data,
-                "has_annotations": bool(data.get("Stamps_and_Annotations")), # Replaced hieroglyph check
+                "has_annotations": bool(data.get("Stamps_and_Annotations")),
             })
     return sorted(cards, key=lambda c: c["name"])
 
@@ -122,7 +121,6 @@ def save_json(card_stem: str, data: dict):
     content = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
     if backend:
         from googleapiclient.http import MediaIoBaseUpload
-        # Delete existing file first to avoid duplicates
         json_files = {f["name"]: f for f in backend.list_files(backend.transcriptions_id)}
         existing = json_files.get(filename)
         if existing:
@@ -161,8 +159,6 @@ def save_uploaded_file(uploaded_file):
         (UPLOADS_DIR / uploaded_file.name).write_bytes(uploaded_file.getbuffer())
 
 
-# --- Other helpers ---
-
 def count_by_status() -> dict:
     counts = {"total": 0, STATUS_PENDING: 0, STATUS_REVIEWED: 0, STATUS_FLAGGED: 0, STATUS_ERROR: 0, "not_transcribed": 0}
     for card in list_cards():
@@ -195,7 +191,6 @@ def append_to_csv(image_name: str, data: dict):
         }
         for field in EDITABLE_FIELDS:
             val = data.get(field)
-            # This cleanly handles the Stamps_and_Annotations array by joining them with a pipe character
             row[field] = " | ".join(val) if isinstance(val, list) else (val or "")
         writer.writerow(row)
 
