@@ -237,6 +237,4 @@ def transcribe_image(
 
         raw = re.sub(r"^
 
-http://googleusercontent.com/immersive_entry_chip/0
-
 <FollowUp label="Shall we update the review.py UI next?" query="Yes, let's update review.py to display the original transcription alongside the English translation and the new metadata fields." />
