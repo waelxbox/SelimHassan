@@ -3,10 +3,6 @@ transcribe_engine.py
 ====================
 Core AI transcription and translation logic for the Antiquities Service Archive.
 Sends a single document image to the Gemini API and returns a structured JSON dict.
-
-image_input can be:
-  - a pathlib.Path or str  → read from disk
-  - raw bytes              → encode directly
 """
 
 import base64
@@ -21,7 +17,6 @@ from openai import OpenAI
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
 
-# Upgraded to 3.0 Pro for complex multilingual handwriting recognition
 DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.0-pro")
 
 _MIME_MAP = {
@@ -100,11 +95,6 @@ OUTPUT SCHEMA (strict JSON)
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _recover_truncated_json(raw: str) -> dict | None:
-    """
-    Attempt to salvage a truncated JSON response from the model.
-    Closes any open strings, arrays, and objects, then re-parses.
-    Returns a dict on success, or None if recovery fails.
-    """
     s = raw.rstrip()
     depth_brace = s.count('{') - s.count('}')
     depth_bracket = s.count('[') - s.count(']')
@@ -170,7 +160,7 @@ def build_client(api_key: str | None = None, base_url: str | None = None) -> Ope
     key = api_key or os.environ.get("OPENAI_API_KEY", "")
     url = base_url or os.environ.get(
         "OPENAI_BASE_URL",
-        "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "[https://generativelanguage.googleapis.com/v1beta/openai/](https://generativelanguage.googleapis.com/v1beta/openai/)",
     )
     return OpenAI(api_key=key, base_url=url)
 
@@ -182,9 +172,6 @@ def transcribe_image(
     model: str = DEFAULT_MODEL,
     filename: str = "document.jpg",
 ) -> dict:
-    """
-    Send one image to the AI API and return the parsed JSON dict.
-    """
     b64, mime, source_name = _encode_image(image_input, filename=filename)
 
     messages = [
@@ -232,5 +219,38 @@ def transcribe_image(
             }
 
         raw = content.strip()
-# Strip accidental markdown fences
-        raw = re.sub(r"^
+        
+        # Strip accidental markdown fences using hex to avoid parser bugs
+        raw = re.sub(r"^\x60\x60\x60(?:json)?\s*", "", raw)
+        raw = re.sub(r"\s*\x60\x60\x60$", "", raw)
+
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError:
+            result = _recover_truncated_json(raw)
+            if result is None:
+                raise
+
+        if "Stamps_and_Annotations" not in result:
+            result["Stamps_and_Annotations"] = []
+
+        result["_source_image"] = source_name
+        result["_model"] = model
+        result["_review_status"] = "pending"
+        return result
+
+    except json.JSONDecodeError as exc:
+        return {
+            "error": f"JSON parse error: {exc}",
+            "raw_response": raw,
+            "_source_image": source_name,
+            "_model": model,
+            "_review_status": "error",
+        }
+    except Exception as exc:
+        return {
+            "error": str(exc),
+            "_source_image": source_name,
+            "_model": model,
+            "_review_status": "error",
+        }
