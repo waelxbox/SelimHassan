@@ -2,7 +2,6 @@
 transcribe_engine.py
 ====================
 Core AI transcription and translation logic for the Antiquities Service Archive.
-Sends a single document image to the Gemini API and returns a structured JSON dict.
 """
 
 import base64
@@ -43,9 +42,9 @@ DOCUMENT CONTEXT & COMMON ENTITIES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Based on the archive's specific history, you will encounter the following:
-- Senders (Directors General): P. Lacau, C.C. Edgar, G. Daressy.
+- Senders (Directors General): P. Lacau, C.C. Edgar, G. Daressy, Jean Capart.
 - Primary Recipient: Monsieur E. Baraize (Directeur de Travaux du Service des Antiquités).
-- Duty Stations: Poste des Pyramides (Giza), Abydos (Balianah), Louxor, Tounah.
+- Duty Stations: Poste des Pyramides (Giza), Abydos (Balianah), Louxor, Tounah, Saqqarah.
 - Key Elements: References to previous letters (e.g., "lettre N° 244"), equipment \
   dimensions, personnel management, and site administration.
 
@@ -55,7 +54,7 @@ TRANSCRIPTION & TRANSLATION RULES
 
 1. BILINGUAL TRANSCRIPTION: You MUST transcribe both the French and the Arabic text. \
    Provide a highly accurate, verbatim transcription. Preserve line breaks and \
-   administrative formatting (e.g., placing the date "Le Caire, le..." accurately).
+   administrative formatting.
 
 2. MARGINALIA & STAMPS: Do not ignore handwriting or stamps. \
    - When transcribing handwritten Arabic notes, prefix them with [Handwritten Arabic: ]. \
@@ -63,32 +62,38 @@ TRANSCRIPTION & TRANSLATION RULES
    - When you see pencil marks/underlines, indicate it with [Pencil note: text].
 
 3. ENGLISH TRANSLATION: Provide a clear, professional English translation of the \
-   ENTIRE document, including translating the French body and the Arabic marginalia. \
-   Ensure historical bureaucratic phrasing is translated cleanly.
+   ENTIRE document, including translating the French body and the Arabic marginalia. 
 
 4. METADATA EXTRACTION: 
-   - Document_Date: Standardize to YYYY-MM-DD. (e.g., "11 Mars 1926" -> 1926-03-11).
-   - Sender & Recipient: Include their titles if present (e.g., "E. Baraize, Directeur de Travaux").
+   - Reference_Number: Extract the official bureaucratic letter or file number (e.g., "N° 27.2/30").
+   - Document_Date: Standardize to YYYY-MM-DD.
+   - Sender & Recipient: Include their titles if present.
+   - Excavation_Site: The specific geographic or archaeological site being discussed.
+   - Entities_Mentioned: An array of specific individuals, local officials, or organizations mentioned in the text.
+   - Thematic_Tags: An array of 2-4 consistent tags (e.g., "Equipment Requisition", "Personnel Management", "Site Construction", "Labor Finance").
 
 5. UNCERTAINTY: If a signature or word is genuinely illegible, write [?] and explain \
    your best guess in the Confidence_Notes.
 
-6. OUTPUT FORMAT: Output ONLY valid JSON. No markdown fences. The response must begin \
-   with { and end with }.
+6. OUTPUT FORMAT: Output ONLY valid JSON. The response must begin with { and end with }.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OUTPUT SCHEMA (strict JSON)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 {
+  "Reference_Number":       "<Official letter/file number | null>",
   "Document_Date":          "<YYYY-MM-DD | null>",
   "Sender":                 "<Name and title of sender | null>",
   "Recipient":              "<Name, title, and location of recipient | null>",
+  "Excavation_Site":        "<Geographic or archaeological site | null>",
+  "Entities_Mentioned":     ["<Array of specific people or organizations mentioned>"],
+  "Thematic_Tags":          ["<Array of 2-4 standard categorical tags>"],
   "Brief_Summary":          "<A 1-2 sentence English summary of the correspondence>",
-  "Original_Transcription": "<Complete verbatim transcription, including [Stamp: ...] and [Handwritten Arabic: ...] tags>",
-  "English_Translation":    "<Complete English translation of both the French and Arabic text>",
-  "Stamps_and_Annotations": ["<Array of strings describing stamps or marginalia, e.g., 'Purple oval stamp: Egyptian Government', 'Red pencil note: Abydos'>"],
-  "Confidence_Notes":       "<Brief notes on illegible signatures, ambiguous phrasing, or physical damage | null>"
+  "Original_Transcription": "<Complete verbatim transcription>",
+  "English_Translation":    "<Complete English translation>",
+  "Stamps_and_Annotations": ["<Array of strings describing stamps or marginalia>"],
+  "Confidence_Notes":       "<Brief notes on illegible elements | null>"
 }
 """
 
@@ -160,7 +165,7 @@ def build_client(api_key: str | None = None, base_url: str | None = None) -> Ope
     key = api_key or os.environ.get("OPENAI_API_KEY", "")
     url = base_url or os.environ.get(
         "OPENAI_BASE_URL",
-        "[https://generativelanguage.googleapis.com/v1beta/openai/](https://generativelanguage.googleapis.com/v1beta/openai/)",
+        "https://generativelanguage.googleapis.com/v1beta/openai/",
     )
     return OpenAI(api_key=key, base_url=url)
 
@@ -231,8 +236,13 @@ def transcribe_image(
             if result is None:
                 raise
 
+        # Ensure arrays exist even if the model misses them
         if "Stamps_and_Annotations" not in result:
             result["Stamps_and_Annotations"] = []
+        if "Entities_Mentioned" not in result:
+            result["Entities_Mentioned"] = []
+        if "Thematic_Tags" not in result:
+            result["Thematic_Tags"] = []
 
         result["_source_image"] = source_name
         result["_model"] = model
