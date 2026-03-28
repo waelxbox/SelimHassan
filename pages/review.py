@@ -1,5 +1,6 @@
 # pages/review.py
-
+import io
+from PIL import Image, ImageOps
 from datetime import datetime, timezone
 import streamlit as st
 from data_store import (
@@ -95,7 +96,11 @@ def render():
     with left_col:
         st.subheader("Original Scan")
         try:
-            st.image(get_image_bytes(card), use_container_width=True)
+            raw_bytes = get_image_bytes(card)
+            img = Image.open(io.BytesIO(raw_bytes))
+            # Automatically rotate the image upright based on phone camera EXIF data
+            img = ImageOps.exif_transpose(img)
+            st.image(img, use_container_width=True)
         except Exception as e:
             st.error(f"Cannot display image: {e}")
             
