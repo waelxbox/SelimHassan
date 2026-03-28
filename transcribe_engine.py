@@ -232,9 +232,5 @@ def transcribe_image(
             }
 
         raw = content.strip()
-        
-       # Strip accidental markdown fences
-
+# Strip accidental markdown fences
         raw = re.sub(r"^
-
-<FollowUp label="Shall we update the review.py UI next?" query="Yes, let's update review.py to display the original transcription alongside the English translation and the new metadata fields." />
