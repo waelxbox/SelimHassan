@@ -39,7 +39,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- Backend helper ---
 
-ddef _get_backend():
+def _get_backend():
     """Returns a live GDriveStore instance using your OAuth login."""
     if "oauth_gdrive_creds" in st.session_state:
         try:
