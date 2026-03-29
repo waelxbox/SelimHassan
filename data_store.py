@@ -40,20 +40,32 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 # --- Backend helper ---
 
 def _get_backend():
-    """Tries to initialize Google Drive backend from Streamlit Secrets."""
-    if "gdrive_creds" not in st.session_state:
-        # Check if credentials exist in Streamlit Secrets
-        if "SERVICE_ACCOUNT_JSON" in st.secrets:
-            try:
-                from gdrive_store import GDriveStore
-                # Parse the secret string back into a dict
-                creds_dict = json.loads(st.secrets["SERVICE_ACCOUNT_JSON"])
-                st.session_state["gdrive_creds"] = GDriveStore(creds_dict)
-            except Exception as e:
-                st.error(f"Failed to initialize Google Drive: {e}")
-                return None
+    """Returns a live GDriveStore instance, or None if not configured."""
+    # Check if we already have a live connection in session state
+    if "live_gdrive_connection" in st.session_state:
+        return st.session_state["live_gdrive_connection"]
     
-    return st.session_state.get("gdrive_creds")
+    # If not, try to build it from secrets
+    if "SERVICE_ACCOUNT_JSON" in st.secrets:
+        try:
+            from gdrive_store import GDriveStore
+            import json
+            
+            # 1. Parse the secret string into a dictionary
+            creds_text = st.secrets["SERVICE_ACCOUNT_JSON"]
+            creds_dict = json.loads(creds_text)
+            
+            # 2. Create the live connection object
+            backend = GDriveStore(creds_dict)
+            
+            # 3. Store the LIVE OBJECT, not the text
+            st.session_state["live_gdrive_connection"] = backend
+            return backend
+        except Exception as e:
+            st.error(f"Failed to initialize Google Drive: {e}")
+            return None
+            
+    return None
 
 # --- Unified I/O ---
 
