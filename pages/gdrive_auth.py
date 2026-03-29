@@ -1,63 +1,52 @@
 import streamlit as st
+from google_auth_oauthlib.flow import Flow
 import json
-from data_store import _get_backend
+
+SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 def render():
-    st.title("Cloud Storage Status")
-    
-    # SAFE: Just calling the function, not printing the result yet
-    backend = _get_backend()
+    st.title("Connect to Google Drive")
+    st.caption("Log in with your Google account to use your personal storage quota.")
 
-    if backend:
-        st.success("✅ Connected to Google Drive")
-        
-        # SAFE: Hardcoded strings, not the object itself
-        st.write(f"Connected to project: **{st.secrets['SERVICE_ACCOUNT_JSON'].split('project_id\": \"')[1].split('\"')[0]}**")
-        
-        # SAFE: Only printing the ID string, not the whole folder object
-        st.info(f"Root Archive Folder ID: `{backend.root_id}`")
-        
-        st.divider()
-        st.write("### Active Folders")
-        st.write(f"- **Scans:** `{backend.uploads_id}`")
-        st.write(f"- **Transcriptions:** `{backend.transcriptions_id}`")
-    else:
-        st.error("❌ Not Connected")
-        st.info("Check your Streamlit Secrets and ensure the JSON is valid.")
+    # 1. Check if already logged in
+    if "oauth_gdrive_creds" in st.session_state:
+        st.success("✅ Google Drive is connected as YOU!")
+        st.info("Your uploads will now successfully bypass the 0-byte Service Account quota.")
+        if st.button("Disconnect"):
+            del st.session_state["oauth_gdrive_creds"]
+            st.rerun()
+        return
 
-    # Try to initialize the backend using the Service Account from Secrets
-    backend = _get_backend()
+    # 2. Check for the Client Secrets in Streamlit Secrets
+    if "OAUTH_CLIENT_SECRETS" not in st.secrets:
+        st.error("Missing Client Secrets.")
+        st.info("Please paste your OAuth 2.0 Client ID JSON into Streamlit Secrets as OAUTH_CLIENT_SECRETS.")
+        return
 
-    if backend:
-        st.success("✅ Connected to Google Drive")
-        st.info("The app is using the Service Account: \n" 
-                f"`{st.secrets['SERVICE_ACCOUNT_JSON'][:50]}...`")
+    # 3. Generate the Login Link
+    try:
+        client_secrets = json.loads(st.secrets["OAUTH_CLIENT_SECRETS"])
+        flow = Flow.from_client_secrets_info(
+            client_secrets,
+            scopes=SCOPES,
+            redirect_uri="urn:ietf:wg:oauth:2.0:oob"
+        )
+        auth_url, _ = flow.authorization_url(prompt="consent")
         
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Root Archive Folder", "Found" if backend.root_id else "Error")
-        with col2:
-            st.metric("Transcriptions Folder", "Found" if backend.transcriptions_id else "Error")
+        st.markdown(f"### Step 1: [Click here to authorize access]({auth_url})", unsafe_allow_html=True)
+        st.markdown("### Step 2: Paste the code below")
+        
+        auth_code = st.text_input("Enter authorization code from Google:")
+        
+        if st.button("Connect"):
+            if not auth_code:
+                st.warning("Please enter the code first.")
+                return
             
-        st.markdown("---")
-        st.markdown("### Troubleshooting")
-        st.write("If the app cannot see files, ensure you have **shared** your target Google Drive folder with the service account email:")
-        
-        # Pull the email from the secret so you can easily copy it
-        try:
-            creds = json.loads(st.secrets["SERVICE_ACCOUNT_JSON"])
-            email = creds.get("client_email", "Email not found")
-            st.code(email, language="text")
-        except:
-            st.error("Could not parse service account email from secrets.")
-
-    else:
-        st.error("❌ Not Connected")
-        st.warning("The Service Account key in your Streamlit Secrets is either missing or malformed.")
-        
-        st.markdown("""
-        **To fix this:**
-        1. Go to your Streamlit Cloud Dashboard.
-        2. Open **Settings > Secrets**.
-        3. Ensure `SERVICE_ACCOUNT_JSON` is formatted correctly with triple quotes.
-        """)
+            flow.fetch_token(code=auth_code)
+            # Save the active login session!
+            st.session_state["oauth_gdrive_creds"] = flow.credentials.to_json()
+            st.rerun()
+            
+    except Exception as e:
+        st.error(f"Authentication setup failed: {e}")
