@@ -15,8 +15,10 @@ class GDriveStore:
         )
         self.service = build('drive', 'v3', credentials=self.creds)
         
-        # Folder names for the new project
-        self.root_folder_name = "Antiquities_Service_Archive"
+   # HARDCODE THE SHARED FOLDER ID HERE
+        self.root_id = "1lTRwzaW646YNw1Q9A9sqacOO00E1BIYw"
+        
+        # Sub-folders to create inside your shared folder
         self.uploads_folder_name = "scans"
         self.transcriptions_folder_name = "transcriptions"
         
@@ -24,7 +26,7 @@ class GDriveStore:
 
     def _ensure_folders(self):
         """Ensures the folder structure exists in Google Drive."""
-        self.root_id = self._get_or_create_folder(self.root_folder_name)
+        # Notice we removed the line that tries to create the root folder!
         self.uploads_id = self._get_or_create_folder(self.uploads_folder_name, self.root_id)
         self.transcriptions_id = self._get_or_create_folder(self.transcriptions_folder_name, self.root_id)
 
