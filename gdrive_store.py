@@ -1,28 +1,27 @@
-# gdrive_store.py
-
 import io
 import json
-import streamlit as st
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
-from google.oauth2 import service_account
+# SWAPPED THIS IMPORT:
+from google.oauth2.credentials import Credentials
 
 class GDriveStore:
     def __init__(self, credentials_info):
-        self.creds = service_account.Credentials.from_service_account_info(
+        # SWAPPED THIS AUTHENTICATION METHOD:
+        self.creds = Credentials.from_authorized_user_info(
             credentials_info,
             scopes=['https://www.googleapis.com/auth/drive']
         )
         self.service = build('drive', 'v3', credentials=self.creds)
         
-   # HARDCODE THE SHARED FOLDER ID HERE
-        self.root_id = "1lTRwzaW646YNw1Q9A9sqacOO00E1BIYw"
-        
-        # Sub-folders to create inside your shared folder
+        # Keep your hardcoded Root ID!
+        self.root_id = "PASTE_YOUR_COPIED_FOLDER_ID_HERE"
         self.uploads_folder_name = "scans"
         self.transcriptions_folder_name = "transcriptions"
         
         self._ensure_folders()
+        
+    # ... keep all other functions exactly the same ...
 
     def _ensure_folders(self):
         """Ensures the folder structure exists in Google Drive."""
