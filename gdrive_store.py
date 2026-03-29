@@ -15,7 +15,7 @@ class GDriveStore:
         self.service = build('drive', 'v3', credentials=self.creds)
         
         # Keep your hardcoded Root ID!
-        self.root_id = "PASTE_YOUR_COPIED_FOLDER_ID_HERE"
+        self.root_id = "1lTRwzaW646YNw1Q9A9sqacOO00E1BIYw"
         self.uploads_folder_name = "scans"
         self.transcriptions_folder_name = "transcriptions"
         
