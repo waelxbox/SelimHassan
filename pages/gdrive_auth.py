@@ -26,7 +26,7 @@ def render():
     # 3. Generate the Login Link
     try:
         client_secrets = json.loads(st.secrets["OAUTH_CLIENT_SECRETS"])
-        flow = Flow.from_client_secrets_info(
+        flow = Flow.from_client_config(
             client_secrets,
             scopes=SCOPES,
             redirect_uri="urn:ietf:wg:oauth:2.0:oob"
