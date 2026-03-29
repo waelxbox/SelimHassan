@@ -39,32 +39,18 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- Backend helper ---
 
-def _get_backend():
-    """Returns a live GDriveStore instance, or None if not configured."""
-    # Check if we already have a live connection in session state
-    if "live_gdrive_connection" in st.session_state:
-        return st.session_state["live_gdrive_connection"]
-    
-    # If not, try to build it from secrets
-    if "SERVICE_ACCOUNT_JSON" in st.secrets:
+ddef _get_backend():
+    """Returns a live GDriveStore instance using your OAuth login."""
+    if "oauth_gdrive_creds" in st.session_state:
         try:
             from gdrive_store import GDriveStore
             import json
-            
-            # 1. Parse the secret string into a dictionary
-            creds_text = st.secrets["SERVICE_ACCOUNT_JSON"]
-            creds_dict = json.loads(creds_text)
-            
-            # 2. Create the live connection object
-            backend = GDriveStore(creds_dict)
-            
-            # 3. Store the LIVE OBJECT, not the text
-            st.session_state["live_gdrive_connection"] = backend
-            return backend
+            # Load the credentials you generated on the Auth page
+            creds_dict = json.loads(st.session_state["oauth_gdrive_creds"])
+            return GDriveStore(creds_dict)
         except Exception as e:
             st.error(f"Failed to initialize Google Drive: {e}")
             return None
-            
     return None
 
 # --- Unified I/O ---
