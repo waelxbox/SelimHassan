@@ -17,23 +17,26 @@ def render():
             st.rerun()
         return
 
-    # 2. Check for the Client Secrets in Streamlit Secrets
     if "OAUTH_CLIENT_SECRETS" not in st.secrets:
         st.error("Missing Client Secrets.")
-        st.info("Please paste your OAuth 2.0 Client ID JSON into Streamlit Secrets as OAUTH_CLIENT_SECRETS.")
         return
 
-    # 3. Generate the Login Link
     try:
-        client_secrets = json.loads(st.secrets["OAUTH_CLIENT_SECRETS"])
-        flow = Flow.from_client_config(
-            client_secrets,
-            scopes=SCOPES,
-            redirect_uri="urn:ietf:wg:oauth:2.0:oob"
-        )
-        auth_url, _ = flow.authorization_url(prompt="consent")
-        
-        st.markdown(f"### Step 1: [Click here to authorize access]({auth_url})", unsafe_allow_html=True)
+        # 2. Setup the Flow ONCE and lock it into session state
+        if "oauth_flow" not in st.session_state:
+            client_secrets = json.loads(st.secrets["OAUTH_CLIENT_SECRETS"])
+            flow = Flow.from_client_config(
+                client_secrets,
+                scopes=SCOPES,
+                redirect_uri="urn:ietf:wg:oauth:2.0:oob"
+            )
+            auth_url, _ = flow.authorization_url(prompt="consent")
+            
+            # Save the handshake and URL to memory so they survive the button click!
+            st.session_state["oauth_flow"] = flow
+            st.session_state["auth_url"] = auth_url
+
+        st.markdown(f"### Step 1: [Click here to authorize access]({st.session_state['auth_url']})", unsafe_allow_html=True)
         st.markdown("### Step 2: Paste the code below")
         
         auth_code = st.text_input("Enter authorization code from Google:")
@@ -43,9 +46,17 @@ def render():
                 st.warning("Please enter the code first.")
                 return
             
+            # Retrieve the exact same handshake flow from memory
+            flow = st.session_state["oauth_flow"]
             flow.fetch_token(code=auth_code)
-            # Save the active login session!
+            
+            # Save the active login session
             st.session_state["oauth_gdrive_creds"] = flow.credentials.to_json()
+            
+            # Clean up memory
+            del st.session_state["oauth_flow"]
+            del st.session_state["auth_url"]
+            
             st.rerun()
             
     except Exception as e:
