@@ -4,7 +4,26 @@ from data_store import _get_backend
 
 def render():
     st.title("Cloud Storage Status")
-    st.caption("Verifying the connection between this app and your Google Drive via the Service Account.")
+    
+    # SAFE: Just calling the function, not printing the result yet
+    backend = _get_backend()
+
+    if backend:
+        st.success("✅ Connected to Google Drive")
+        
+        # SAFE: Hardcoded strings, not the object itself
+        st.write(f"Connected to project: **{st.secrets['SERVICE_ACCOUNT_JSON'].split('project_id\": \"')[1].split('\"')[0]}**")
+        
+        # SAFE: Only printing the ID string, not the whole folder object
+        st.info(f"Root Archive Folder ID: `{backend.root_id}`")
+        
+        st.divider()
+        st.write("### Active Folders")
+        st.write(f"- **Scans:** `{backend.uploads_id}`")
+        st.write(f"- **Transcriptions:** `{backend.transcriptions_id}`")
+    else:
+        st.error("❌ Not Connected")
+        st.info("Check your Streamlit Secrets and ensure the JSON is valid.")
 
     # Try to initialize the backend using the Service Account from Secrets
     backend = _get_backend()
